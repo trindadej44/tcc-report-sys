@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+   <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Sistema de Relatórios Técnicos</title>
+      <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+      <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --primary-light: #60a5fa;
+            --secondary: #64748b;
+            --background: #f8fafc;
+            --white: #ffffff;
+            --error: #ef4444;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --text-primary: #1e293b;
+    }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: var(--background);
+            min-height: 100vh;
+        }
+
+        /* Login */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+        }
+
+        .login-card {
+            background: var(--white);
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        /* Dashboard */
+        .dashboard {
+            display: none;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: 280px;
+            background: var(--white);
+            padding: 2rem;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .main-content {
+            margin-left: 280px;
+            padding: 2rem;
+        }
+
+        /* Componentes comuns */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--text-primary);
+        }
+
+        /* Status badges */
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .badge-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-billed {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        /* Role-specific views */
+        .technician-view .manager-only,
+        .technician-view .billing-only {
+            display: none !important;
+        }
+
+        .manager-view .billing-only {
+            display: none !important;
+        }
+
+        .billing-view .technician-only,
+        .billing-view .manager-only {
+            display: none !important;
+        }
+
+        /* Tabela */
+        .table-container {
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            overflow-x: auto;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th,
+        .table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        /* Modal */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        /* Menu */
+        .sidebar-menu {
+            list-style: none;
+        }
+
+        .sidebar-menu-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar-menu-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            border-radius: 8px;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stats-card {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stats-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-top: 0.5rem;
+        }
+
+        .primary {
+            color: var(--primary);
+        }
+
+        .warning {
+            color: var(--warning);
+        }
+
+        .success {
+            color: var(--success);
+        }
+
+        .primary-dark {
+            color: var(--primary-dark);
+        }
+
+        /* Animações Globais */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes modalScale {
+            from {
+                transform: scale(0.7);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Sidebar Melhorada */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: 280px;
+            background: var(--white);
+            padding: 2rem;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .sidebar-menu-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-menu-link:hover {
+            background-color: var(--primary-light);
+            color: var(--white);
+        }
+
+        .sidebar-menu-link i {
+            margin-right: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-menu-link:hover i {
+            transform: scale(1.2) rotate(360deg);
+        }
+
+        /* Efeito hover com underline */
+        .sidebar-menu-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .sidebar-menu-link:hover::after {
+            width: 100%;
+        }
+
+        /* Modal Melhorado */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1100;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+            animation: modalScale 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .modal::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg,
+                    transparent,
+                    var(--primary-light),
+                    transparent);
+            transform: rotate(-45deg);
+            opacity: 0.1;
+        }
+
+        /* Botões dentro do modal */
+        .modal .btn {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal .btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(120deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.3),
+                    transparent);
+            transition: all 0.3s ease;
+        }
+
+        .modal .btn:hover::after {
+            left: 100%;
+        }
+
+        /* Animação de entrada para elementos */
+        .animate-slide-in {
+            animation: slideIn 0.5s ease forwards;
+            opacity: 0;
+        }
+
+        /* Responsividade para sidebar */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 250px;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+      </style>
+   </head>
+   <body>
+      <!-- Login -->
+      <div class="login-container" id="loginPage">
+         <div class="login-card">
+            <h2 style="margin-bottom: 2rem; text-align: center; color: var(--primary);">
+               <i class="fas fa-file-alt"></i> Sistema de Relatórios
+            </h2>
+            <form id="loginForm">
+               <div class="form-group">
+                  <label class="form-label">E-mail</label>
+                  <input type="email" name="email" class="form-input" required>
+               </div>
+               <div class="form-group">
+                  <label class="form-label">Senha</label>
+                  <input type="password" name="password" class="form-input" required>
+               </div>
+               <button type="submit" class="btn btn-primary" style="width: 100%;">
+               <i class="fas fa-sign-in-alt"></i> Entrar
+               </button>
+            </form>
+         </div>
+      </div>
+      <!-- Dashboard -->
+      <div class="dashboard" id="dashboardPage">
+         <nav class="sidebar">
+            <div style="margin-bottom: 2rem;">
+               <h2 style="color: var(--primary);">
+                  <i class="fas fa-file-alt"></i> TechReport
+               </h2>
+               <p id="userInfo" style="margin-top: 0.5rem; color: var(--secondary);"></p>
+            </div>
+            <ul class="sidebar-menu">
+               <li class="sidebar-menu-item">
+                  <a href="#" class="sidebar-menu-link">
+                  <i class="fas fa-home"></i> Dashboard
+                  </a>
+               </li>
+               <li class="sidebar-menu-item technician-only">
+                  <a href="#" class="sidebar-menu-link" id="newReportBtn">
+                  <i class="fas fa-plus"></i> Novo Relatório
+                  </a>
+               </li>
+               <li class="sidebar-menu-item manager-only">
+                  <a href="#" class="sidebar-menu-link" id="approvalBtn">
+                  <i class="fas fa-check-circle"></i> Aprovações
+                  </a>
+               </li>
+               <li class="sidebar-menu-item billing-only">
+                  <a href="#" class="sidebar-menu-link" id="billingBtn">
+                  <i class="fas fa-dollar-sign"></i> Faturamento
+                  </a>
+               </li>
+               <li class="sidebar-menu-item">
+                  <a href="#" class="sidebar-menu-link" id="logoutBtn">
+                  <i class="fas fa-sign-out-alt"></i> Sair
+                  </a>
+               </li>
+            </ul>
+         </nav>
+         <main class="main-content">
+            <div class="table-container">
+               <h3 style="padding: 1rem;">Relatórios</h3>
+               <table class="table">
+                  <thead>
+                     <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>Técnico</th>
+                        <th>Data</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                     </tr>
+                  </thead>
+                  <tbody id="reportsTable"></tbody>
+               </table>
+            </div>
+         </main>
+      </div>
+      <!-- Modal Novo Relatório -->
+      <div class="modal-backdrop" id="newReportModal">
+         <div class="modal">
+            <h3 style="margin-bottom: 1.5rem;">Novo Relatório</h3>
+            <form id="newReportForm">
+               <div class="form-group">
+                  <label class="form-label">Título</label>
+                  <input type="text" name="title" class="form-input" required>
+               </div>
+               <div class="form-group">
+                  <label class="form-label">Descrição</label>
+                  <textarea name="description" class="form-input" rows="4" required></textarea>
+               </div>
+               <div style="display: flex; gap: 1rem;">
+                  <button type="button" class="btn btn-secondary" onclick="closeModal('newReportModal')">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">Enviar</button>
+               </div>
+            </form>
+         </div>
+      </div>
+      <script>
+         // Mock de usuários e dados
+         const users = {
+             'tecnico@exemplo.com': { role: 'technician', name: 'João Silva', password: '123' },
+             'gestor@exemplo.com': { role: 'manager', name: 'Maria Santos', password: '123' },
+             'faturamento@exemplo.com': { role: 'billing', name: 'Pedro Costa', password: '123' }
+         };
+         
+         let reports = [{
+        id: 1,
+        title: 'Manutenção Preventiva - Servidor Principal',
+        technician: 'João Silva',
+        date: '19/02/2025',
+        status: 'pending',
+        description: 'Realizada manutenção preventiva no servidor principal.'
+    },
+    {
+        id: 2,
+        title: 'Atualização de Sistema - Banco de Dados',
+        technician: 'Maria Oliveira',
+        date: '18/02/2025',
+        status: 'approved',
+        description: 'Atualização do sistema de gerenciamento de banco de dados para versão mais recente.'
+    },
+    {
+        id: 3,
+        title: 'Troca de HD - Servidor de Backup',
+        technician: 'Carlos Souza',
+        date: '17/02/2025',
+        status: 'billed',
+        description: 'Substituição do HD do servidor de backup devido a falha no disco rígido.'
+    },
+    {
+        id: 4,
+        title: 'Instalação de Software - Segurança',
+        technician: 'Ana Costa',
+        date: '16/02/2025',
+        status: 'billed',
+        description: 'Instalação de novo software de segurança para proteção contra vírus e malwares.'
+    },
+    {
+        id: 5,
+        title: 'Configuração de Rede - Novos Equipamentos',
+        technician: 'Lucas Pereira',
+        date: '15/02/2025',
+        status: 'approved',
+        description: 'Configuração de rede e dispositivos para integração com novos equipamentos.'
+    },
+    {
+        id: 6,
+        title: 'Diagnóstico de Desempenho - Servidor de Aplicações',
+        technician: 'Beatriz Lima',
+        date: '14/02/2025',
+        status: 'pending',
+        description: 'Análise de desempenho do servidor de aplicações para identificação de gargalos.'
+    },
+    {
+        id: 7,
+        title: 'Substituição de Roteador - Filial 2',
+        technician: 'Felipe Martins',
+        date: '13/02/2025',
+        status: 'approved',
+        description: 'Troca de roteador na filial 2 devido a falha de conexão constante.'
+    },
+    {
+        id: 8,
+        title: 'Reparo de Software - Sistema de Gestão',
+        technician: 'Juliana Alves',
+        date: '12/02/2025',
+        status: 'approved',
+        description: 'Correção de falhas no sistema de gestão de estoque e financeiro.'
+    },
+    {
+        id: 9,
+        title: 'Verificação de Segurança - Rede Interna',
+        technician: 'Ricardo Santos',
+        date: '11/02/2025',
+        status: 'pending',
+        description: 'Verificação de vulnerabilidades na rede interna e aplicação de patches de segurança.'
+    },
+    {
+        id: 10,
+        title: 'Instalação de Backup - Servidor Secundário',
+        technician: 'Patrícia Rocha',
+        date: '10/02/2025',
+        status: 'billed',
+        description: 'Instalação e configuração do sistema de backup automatizado no servidor secundário.'
+    },
+    {
+        id: 11,
+        title: 'Troca de Cabo de Rede - Data Center',
+        technician: 'Ricardo Silva',
+        date: '09/02/2025',
+        status: 'approved',
+        description: 'Substituição de cabo de rede danificado no data center, garantindo estabilidade na comunicação.'
+    },
+    {
+        id: 12,
+        title: 'Monitoramento de Temperatura - Data Center',
+        technician: 'Tatiane Gomes',
+        date: '08/02/2025',
+        status: 'approved',
+        description: 'Verificação e monitoramento de temperatura nos servidores do data center para evitar superaquecimento.'
+    },
+    {
+        id: 13,
+        title: 'Manutenção de Backup - Servidor de Arquivos',
+        technician: 'Márcio Pereira',
+        date: '07/02/2025',
+        status: 'pending',
+        description: 'Verificação e manutenção do sistema de backup no servidor de arquivos corporativo.'
+    },
+    {
+        id: 14,
+        title: 'Reconfiguração de Firewall - Filial 3',
+        technician: 'Gabriel Santos',
+        date: '06/02/2025',
+        status: 'approved',
+        description: 'Reconfiguração do firewall na filial 3 para aumentar a segurança da rede.'
+    },
+    {
+        id: 15,
+        title: 'Instalação de Impressoras - Departamento Financeiro',
+        technician: 'Sandra Lima',
+        date: '05/02/2025',
+        status: 'approved',
+        description: 'Instalação e configuração de impressoras no departamento financeiro.'
+    }
+];
+         
+         let currentUser = null;
+         
+         // Funções de utilidade
+         function showModal(id) {
+             document.getElementById(id).style.display = 'flex';
+         }
+         
+         function closeModal(id) {
+             document.getElementById(id).style.display = 'none';
+         }
+         
+         function updateUI() {
+             const dashboard = document.getElementById('dashboardPage');
+             dashboard.className = `dashboard ${currentUser.role}-view`;
+             
+             document.getElementById('userInfo').textContent = 
+                 `${currentUser.name} (${getRoleName(currentUser.role)})`;
+         
+             renderReports();
+         }
+         
+         function getRoleName(role) {
+             const roles = {
+                 technician: 'Técnico',
+                 manager: 'Gestor',
+                 billing: 'Faturamento'
+             };
+             return roles[role];
+         }
+         
+         function getStatusBadge(status) {
+             const badges = {
+                 pending: '<span class="badge badge-pending">Pendente</span>',
+                 approved: '<span class="badge badge-approved">Aprovado</span>',
+                 billed: '<span class="badge badge-billed">Faturado</span>'
+             };
+             return badges[status];
+         }
+         
+         function renderReports() {
+             const tbody = document.getElementById('reportsTable');
+             tbody.innerHTML = reports.map(report => `
+                 <tr>
+                     <td>#${report.id}</td>
+                     <td>${report.title}</td>
+                     <td>${report.technician}</td>
+                     <td>${report.date}</td>
+                     <td>${getStatusBadge(report.status)}</td>
+                     <td>
+                         <button class="btn btn-secondary" onclick="viewReport(${report.id})">
+                             <i class="fas fa-eye"></i>
+                         </button>
+                         ${currentUser.role === 'manager' ? `
+                             <button class="btn btn-secondary" onclick="approveReport(${report.id})">
+                                 <i class="fas fa-check"></i>
+                             </button>
+                         ` : ''}
+                         ${currentUser.role === 'billing' && report.status === 'approved' ? `
+                             <button class="btn btn-secondary" onclick="billReport(${report.id})">
+                                 <i class="fas fa-dollar-sign"></i>
+                             </button>
+                         ` : ''}
+                     </td>
+                 </tr>
+             `).join('');
+         }
+         
+         // Event Listeners
+         document.getElementById('loginForm').addEventListener('submit', function(e) {
+             e.preventDefault();
+             const email = e.target.email.value;
+             const password = e.target.password.value;
+         
+             if (users[email] && users[email].password === password) {
+                 currentUser = { ...users[email], email };
+                 document.getElementById('loginPage').style.display = 'none';
+                 document.getElementById('dashboardPage').style.display = 'block';
+                 updateUI();
+             } else {
+                 alert('Credenciais inválidas!');
+             }
+         });
+         
+         document.getElementById('logoutBtn').addEventListener('click', function() {
+             currentUser = null;
+             document.getElementById('dashboardPage').style.display = 'none';
+             document.getElementById('loginPage').style.display = 'flex';
+             document.getElementById('loginForm').reset();
+         });
+         
+         document.getElementById('newReportBtn')?.addEventListener('click', function() {
+             showModal('newReportModal');
+         });
+         
+         document.getElementById('newReportForm')?.addEventListener('submit', function(e) {
+             e.preventDefault();
+             const newReport = {
+                 id: reports.length + 1,
+                 title: e.target.title.value,
+                 description: e.target.description.value,
+                 technician: currentUser.name,
+                 date: new Date().toLocaleDateString(),
+                 status: 'pending'
+             };
+             reports.push(newReport);
+             closeModal('newReportModal');
+             e.target.reset();
+             renderReports();
+         });
+         
+         // Funções de gerenciamento de relatórios
+         function viewReport(id) {
+             const report = reports.find(r => r.id === id);
+             if (!report) return;
+         
+             const modalHtml = `
+                 <div class="modal-backdrop" id="viewReportModal">
+                     <div class="modal">
+                         <h3 style="margin-bottom: 1rem;">Detalhes do Relatório #${report.id}</h3>
+                         <div style="margin-bottom: 1.5rem;">
+                             <h4>${report.title}</h4>
+                             <p style="color: var(--secondary); margin: 0.5rem 0;">
+                                 Técnico: ${report.technician}<br>
+                                 Data: ${report.date}<br>
+                                 Status: ${report.status}
+                             </p>
+                             <p style="margin-top: 1rem;">${report.description}</p>
+                         </div>
+                         <div style="display: flex; gap: 1rem;">
+                             <button class="btn btn-secondary" onclick="closeModal('viewReportModal')">Fechar</button>
+                             ${currentUser.role === 'manager' && report.status === 'pending' ? `
+                                 <button class="btn btn-primary" onclick="approveReport(${report.id})">Aprovar</button>
+                             ` : ''}
+                             ${currentUser.role === 'billing' && report.status === 'approved' ? `
+                                 <button class="btn btn-primary" onclick="billReport(${report.id})">Faturar</button>
+                             ` : ''}
+                         </div>
+                     </div>
+                 </div>
+             `;
+         
+             // Remove any existing modal
+             const existingModal = document.getElementById('viewReportModal');
+             if (existingModal) {
+                 existingModal.remove();
+             }
+         
+             // Add new modal to body
+             document.body.insertAdjacentHTML('beforeend', modalHtml);
+             showModal('viewReportModal');
+         }
+         
+         function approveReport(id) {
+             if (currentUser.role !== 'manager') return;
+             
+             const report = reports.find(r => r.id === id);
+             if (report && report.status === 'pending') {
+                 report.status = 'approved';
+                 renderReports();
+                 alert('Relatório aprovado com sucesso!');
+                 
+                 const modal = document.getElementById('viewReportModal');
+                 if (modal) {
+                     closeModal('viewReportModal');
+                 }
+             }
+         }
+         
+         function billReport(id) {
+             if (currentUser.role !== 'billing') return;
+             
+             const report = reports.find(r => r.id === id);
+             if (report && report.status === 'approved') {
+                 report.status = 'billed';
+                 renderReports();
+                 alert('Relatório faturado com sucesso!');
+                 
+                 const modal = document.getElementById('viewReportModal');
+                 if (modal) {
+                     closeModal('viewReportModal');
+                 }
+             }
+         }
+         
+         // Dashboard stats
+         function updateDashboardStats() {
+             const stats = {
+                 total: reports.length,
+                 pending: reports.filter(r => r.status === 'pending').length,
+                 approved: reports.filter(r => r.status === 'approved').length,
+                 billed: reports.filter(r => r.status === 'billed').length
+             };
+         
+             const statsHtml = `
+         <div class="stats-container">
+         <div class="stats-card">
+             <h4>Total de Relatórios</h4>
+             <p class="stats-number primary">${stats.total}</p>
+         </div>
+         <div class="stats-card">
+             <h4>Pendentes</h4>
+             <p class="stats-number warning">${stats.pending}</p>
+         </div>
+         <div class="stats-card">
+             <h4>Aprovados</h4>
+             <p class="stats-number success">${stats.approved}</p>
+         </div>
+         <div class="stats-card">
+             <h4>Faturados</h4>
+             <p class="stats-number primary-dark">${stats.billed}</p>
+         </div>
+         </div>
+         `;
+         
+             const mainContent = document.querySelector('.main-content');
+             const existingStats = mainContent.querySelector('.stats-container');
+             
+             if (existingStats) {
+                 existingStats.remove();
+             }
+         
+             const statsContainer = document.createElement('div');
+             statsContainer.className = 'stats-container';
+             statsContainer.innerHTML = statsHtml;
+             mainContent.insertBefore(statsContainer, mainContent.firstChild);
+         }
+         
+         // Filtros de relatório
+         function addReportFilters() {
+             const filterHtml = `
+                 <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
+                     <select class="form-input" style="width: auto;" id="statusFilter">
+                         <option value="all">Todos os Status</option>
+                         <option value="pending">Pendentes</option>
+                         <option value="approved">Aprovados</option>
+                         <option value="billed">Faturados</option>
+                     </select>
+                     <input type="text" class="form-input" style="width: auto;" placeholder="Buscar..." id="searchFilter">
+                 </div>
+             `;
+         
+             const tableContainer = document.querySelector('.table-container');
+             tableContainer.insertAdjacentHTML('afterbegin', filterHtml);
+             document.getElementById('statusFilter').addEventListener('change', filterReports);
+             document.getElementById('searchFilter').addEventListener('input', filterReports);
+         }
+         
+         function filterReports() {
+             const statusFilter = document.getElementById('statusFilter').value;
+             const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+         
+             const filteredReports = reports.filter(report => {
+                 const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
+                 const matchesSearch = report.title.toLowerCase().includes(searchFilter) ||
+                                     report.technician.toLowerCase().includes(searchFilter);
+                 return matchesStatus && matchesSearch;
+             });
+         
+             const tbody = document.getElementById('reportsTable');
+             tbody.innerHTML = filteredReports.map(report => `
+                 <tr>
+                     <td>#${report.id}</td>
+                     <td>${report.title}</td>
+                     <td>${report.technician}</td>
+                     <td>${report.date}</td>
+                     <td>${getStatusBadge(report.status)}</td>
+                     <td>
+                         <button class="btn btn-secondary" onclick="viewReport(${report.id})">
+                             <i class="fas fa-eye"></i>
+                         </button>
+                         ${currentUser.role === 'manager' && report.status === 'pending' ? `
+                             <button class="btn btn-secondary" onclick="approveReport(${report.id})">
+                                 <i class="fas fa-check"></i>
+                             </button>
+                         ` : ''}
+                         ${currentUser.role === 'billing' && report.status === 'approved' ? `
+                             <button class="btn btn-secondary" onclick="billReport(${report.id})">
+                                 <i class="fas fa-dollar-sign"></i>
+                             </button>
+                         ` : ''}
+                     </td>
+                 </tr>
+             `).join('');
+         }
+         
+         // Inicialização
+         function initializeSystem() {
+            
+             addReportFilters();
+             updateDashboardStats();
+             window.onclick = function(event) {
+                 if (event.target.classList.contains('modal-backdrop')) {
+                     event.target.style.display = 'none';
+                 }
+             };
+         }
+                 
+         document.getElementById('loginForm').addEventListener('submit', function(e) {
+             initializeSystem();
+         });
+      </script>
+   </body>
+</html>
