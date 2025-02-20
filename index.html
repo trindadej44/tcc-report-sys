@@ -3,8 +3,9 @@
    <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Sistema de Relatórios Técnicos</title>
+      <title>Report Sys</title>
       <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
       <style>
         :root {
             --primary: #3b82f6;
@@ -368,21 +369,6 @@
             overflow: hidden;
         }
 
-        .modal::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg,
-                    transparent,
-                    var(--primary-light),
-                    transparent);
-            transform: rotate(-45deg);
-            opacity: 0.1;
-        }
-
         /* Botões dentro do modal */
         .modal .btn {
             position: relative;
@@ -414,17 +400,109 @@
             opacity: 0;
         }
 
-        /* Responsividade para sidebar */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 250px;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
+        @media (max-width: 1024px) {
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr);
             }
 
-            .sidebar.open {
+            .table-container {
+                overflow-x: auto;
+            }
+
+            .main-content {
+                margin-left: 280px;
+                padding: 1rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                z-index: 1000;
+            }
+
+            .sidebar.active {
                 transform: translateX(0);
             }
+
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+                position: fixed;
+                top: 1rem;
+                left: 1rem;
+                z-index: 1001;
+                background: var(--primary);
+                color: white;
+                border: none;
+                padding: 0.5rem;
+                border-radius: 4px;
+            }
+
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+
+            .form-input, .btn {
+                font-size: 16px; /* Previne zoom em iOS */
+            }
+
+            /* Ajustes para tabela responsiva */
+            .table-container {
+                margin-top: 3rem;
+            }
+
+            .table th, .table td {
+                padding: 0.75rem;
+                font-size: 0.9rem;
+            }
+
+            /* Ajustes para filtros responsivos */
+            .filters-container {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .filters-container select,
+            .filters-container input {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .modal {
+                width: 95%;
+                padding: 1rem;
+            }
+
+            .login-card {
+                width: 90%;
+                padding: 1.5rem;
+            }
+
+            .btn {
+                padding: 0.5rem 1rem;
+            }
+        }
+
+        /* Novo botão de menu mobile */
+        .mobile-menu-btn {
+            display: none;
+        }
+
+        /* Container de filtros atualizado */
+        .filters-container {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--white);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
       </style>
    </head>
@@ -433,7 +511,7 @@
       <div class="login-container" id="loginPage">
          <div class="login-card">
             <h2 style="margin-bottom: 2rem; text-align: center; color: var(--primary);">
-               <i class="fas fa-file-alt"></i> Sistema de Relatórios
+               <i class="fas fa-file-alt"></i> Report Sys
             </h2>
             <form id="loginForm">
                <div class="form-group">
@@ -455,7 +533,7 @@
          <nav class="sidebar">
             <div style="margin-bottom: 2rem;">
                <h2 style="color: var(--primary);">
-                  <i class="fas fa-file-alt"></i> TechReport
+                  <i class="fas fa-file-alt"></i> Report Sys
                </h2>
                <p id="userInfo" style="margin-top: 0.5rem; color: var(--secondary);"></p>
             </div>
@@ -480,6 +558,11 @@
                   <i class="fas fa-dollar-sign"></i> Faturamento
                   </a>
                </li>
+             <li class="sidebar-menu-item">
+                <a href="#" class="sidebar-menu-link" onclick="exportToExcel()">
+                <i class="fas fa-file-excel"></i> Exportar para Excel
+                </a>
+             </li>
                <li class="sidebar-menu-item">
                   <a href="#" class="sidebar-menu-link" id="logoutBtn">
                   <i class="fas fa-sign-out-alt"></i> Sair
@@ -506,6 +589,11 @@
             </div>
          </main>
       </div>
+
+      <button class="mobile-menu-btn">
+        <i class="fas fa-bars"></i>
+      </button>
+
       <!-- Modal Novo Relatório -->
       <div class="modal-backdrop" id="newReportModal">
          <div class="modal">
@@ -885,23 +973,30 @@
          
          // Filtros de relatório
          function addReportFilters() {
-             const filterHtml = `
-                 <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
-                     <select class="form-input" style="width: auto;" id="statusFilter">
-                         <option value="all">Todos os Status</option>
-                         <option value="pending">Pendentes</option>
-                         <option value="approved">Aprovados</option>
-                         <option value="billed">Faturados</option>
-                     </select>
-                     <input type="text" class="form-input" style="width: auto;" placeholder="Buscar..." id="searchFilter">
-                 </div>
-             `;
-         
-             const tableContainer = document.querySelector('.table-container');
-             tableContainer.insertAdjacentHTML('afterbegin', filterHtml);
-             document.getElementById('statusFilter').addEventListener('change', filterReports);
-             document.getElementById('searchFilter').addEventListener('input', filterReports);
-         }
+            const existingFilters = document.querySelector('.filters-container');
+            if (existingFilters) {
+                existingFilters.remove();
+            }
+
+            const filterHtml = `
+                <div class="filters-container">
+                    <select class="form-input" id="statusFilter">
+                        <option value="all">Todos os Status</option>
+                        <option value="pending">Pendentes</option>
+                        <option value="approved">Aprovados</option>
+                        <option value="billed">Faturados</option>
+                    </select>
+                    <input type="text" class="form-input" placeholder="Buscar..." id="searchFilter">
+                </div>
+            `;
+
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.insertAdjacentHTML('afterbegin', filterHtml);
+            
+            // Adicionar event listeners
+            document.getElementById('statusFilter').addEventListener('change', filterReports);
+            document.getElementById('searchFilter').addEventListener('input', filterReports);
+        }
          
          function filterReports() {
              const statusFilter = document.getElementById('statusFilter').value;
@@ -942,20 +1037,149 @@
          }
          
          // Inicialização
-         function initializeSystem() {
+         function initializeMobileMenu() {
+            const menuBtn = document.querySelector('.mobile-menu-btn');
+            const sidebar = document.querySelector('.sidebar');
+
+            menuBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('active');
+            });
+
+            // Fechar menu ao clicar fora
+            document.addEventListener('click', (e) => {
+                if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
+                    sidebar.classList.remove('active');
+                }
+            });
+        }
+
+        // Atualizar a função initializeSystem
+        function initializeSystem() {
+    addReportFilters();
+    updateDashboardStats();
+    initializeMobileMenu();
+    
+    
+    // Configurar fechamento do modal ao clicar fora
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal-backdrop')) {
+            event.target.style.display = 'none';
+        }
+    };
+}
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = e.target.email.value;
+            const password = e.target.password.value;
+
+            if (users[email] && users[email].password === password) {
+                currentUser = { ...users[email], email };
+                document.getElementById('loginPage').style.display = 'none';
+                document.getElementById('dashboardPage').style.display = 'block';
+                updateUI();
+                initializeSystem(); // Inicializar sistema após login
+            } else {
+                alert('Credenciais inválidas!');
+            }
+        });
+
+        // Atualizar o evento de logout
+        document.getElementById('logoutBtn').addEventListener('click', function() {
+            currentUser = null;
+            document.getElementById('dashboardPage').style.display = 'none';
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('loginForm').reset();
             
-             addReportFilters();
-             updateDashboardStats();
-             window.onclick = function(event) {
-                 if (event.target.classList.contains('modal-backdrop')) {
-                     event.target.style.display = 'none';
-                 }
-             };
-         }
+            // Remover filtros ao fazer logout
+            const existingFilters = document.querySelector('.filters-container');
+            if (existingFilters) {
+                existingFilters.remove();
+            }
+        });
                  
-         document.getElementById('loginForm').addEventListener('submit', function(e) {
-             initializeSystem();
-         });
+
+         function exportToExcel() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+    
+    let reportsToExport = reports.filter(report => {
+        const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
+        const matchesSearch = report.title.toLowerCase().includes(searchFilter) ||
+                              report.technician.toLowerCase().includes(searchFilter);
+        return matchesStatus && matchesSearch;
+    });
+
+    // Restrição para usuários do faturamento
+    if (currentUser.role === 'billing') {
+        reportsToExport = reportsToExport.filter(report => ['approved', 'billed'].includes(report.status));
+    }
+
+    // Mapeamento de status para português
+    const statusMap = {
+        'pending': 'Pendente',
+        'approved': 'Aprovado',
+        'billed': 'Faturado'
+    };
+
+    // Preparar dados para o Excel
+    const excelData = reportsToExport.map(report => ({
+        'ID': `#${report.id}`,
+        'Título': report.title,
+        'Técnico': report.technician,
+        'Data': report.date,
+        'Status': statusMap[report.status] || report.status,
+        'Descrição': report.description,
+        'Última Atualização': new Date().toLocaleDateString('pt-BR'),
+        'Valor': report.status === 'billed' ? 'R$ ' + (Math.random() * 1000).toFixed(2) : '-'
+    }));
+
+    // Criar workbook e worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // Definir larguras das colunas
+    const colWidths = [
+        { wch: 8 },  // ID
+        { wch: 40 }, // Título
+        { wch: 20 }, // Técnico
+        { wch: 12 }, // Data
+        { wch: 12 }, // Status
+        { wch: 50 }, // Descrição
+        { wch: 18 }, // Última Atualização
+        { wch: 15 }  // Valor
+    ];
+    ws['!cols'] = colWidths;
+
+    // Adicionar estilos
+    // Estilizar cabeçalhos
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+        const address = XLSX.utils.encode_col(C) + "1";
+        if (!ws[address]) continue;
+        ws[address].s = {
+            fill: { fgColor: { rgb: "4F81BD" } },
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            alignment: { horizontal: "center" }
+        };
+    }
+
+    // Adicionar filtros
+    ws['!autofilter'] = { ref: ws['!ref'] };
+
+    // Adicionar o worksheet ao workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Relatórios");
+
+    // Gerar nome do arquivo
+    const today = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+    const filename = (currentUser.role === 'billing') 
+        ? `Faturamento_${today}.xlsx` 
+        : `Relatorios_${today}.xlsx`;
+
+    // Exportar arquivo
+    XLSX.writeFile(wb, filename);
+}
+
       </script>
    </body>
 </html>
